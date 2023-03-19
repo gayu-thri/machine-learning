@@ -108,6 +108,7 @@ class NeuralNet(pl.LightningModule):
         )
         return loader
 
+
 # uses hyper params from the checkpoint
 model = NeuralNet(input_size, hidden_size, num_classes)
 # .load_from_checkpoint(
