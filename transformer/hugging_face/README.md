@@ -39,17 +39,17 @@
 
 
 ## Transfer Learning
--   Pretraining
+-   **Pretraining**
     -   Training model from scratch on large amounts of data (starts with randomly initialized weights - training without any prior knowledge)
     -   Requires large corpus and training can take up to several weeks
--   Finetuning
+-   **Finetuning**
     -   Training done after model is pretrained
     -   To perform fine-tuning, 
         -   Acquire a pretrained language model -> perform additional training with a dataset specific to your task
     -   Why not simply train directly for the final task? Reasons:
         -   Pretrained model was already trained on a dataset that has some similarities with fine-tuning dataset
         -   Fine-tuning take advantages of knowledge acquired by the initial model during pretraining
-        -   Ex: NLP problems, pretrained model will have some kind of statistical understanding of the language you are using for your task
+        -   Ex: NLP problems, **pretrained model will have some kind of statistical understanding of the language you are using for your task**
         -   Since the pretrained model was already trained on lots of data, the **fine-tuning requires way less data to get decent results** - Thus, time and resources needed is also lesser.
     -   Ex: Leveraging a pretrained model trained on English language and then fine-tuning it on an arXiv corpus, resulting in a science/research-based model. The fine-tuning will only require a limited amount of data: the **knowledge the pretrained model has acquired is “transferred”**, hence the term transfer learning.
     -   Lower time, data, financial, and environmental costs. 
@@ -72,10 +72,11 @@
 -   Transformers have attention layers 
 -   **Pays specific attention to certain words in the sentence** you passed it (and more or less ignore the others) when dealing with the representation of each word
 -   Ex: Task of translating text from English to French. 
-    -   I/P: “You like this course”, 
-    -   A translation model will need to also attend to the adjacent word “You” to get the proper translation for the word “like”, because in French the verb “like” is conjugated differently depending on the subject. The rest of the sentence, however, is not useful for the translation of that word. In the same vein, when translating “this” the model will also need to pay attention to the word “course”, because “this” translates differently depending on whether the associated noun is masculine or feminine. Again, the other words in the sentence will not matter for the translation of “this”. 
+    -   I/P: `“You like this course”`, 
+    -   A translation model will need to also attend to the adjacent word `“You”` to get the proper translation for the word `“like”`, because in French the verb `“like”` is conjugated differently depending on the subject. Rest of the sentence, is not useful for the translation of that word. 
+    -   In the same vein, when translating `“this”` the model will also need to pay attention to the word `“course”`, because `“this”` translates differently depending on whether the associated noun is masculine or feminine. Again, the other words in the sentence will not matter for the translation of `“this”`. 
 -   Same concept applies to any task associated with natural language: 
-    -   A **word by itself has a meaning**, but that **meaning is deeply affected by the context**, which can be **any other word (or words) before or after the word being studied.**
+    -   NEED FOR ATTENTION: A **word by itself has a meaning**, but that **meaning is deeply affected by the context**, which can be **any other word (or words) before or after the word being studied.**
 
 
 ## Original architecture
@@ -91,8 +92,8 @@
 -   Attention layers in Decoder
     -   **First attention layer** in a decoder block pays attention to all (past) inputs to the decoder
     -   **Second attention layer** uses the output of the encoder
-    -   Thus, decoder can access the whole input sentence to best predict the current word
-    -   Very useful as different languages can have grammatical rules that put the words in different orders, or some context provided later in the sentence may be helpful to determine the best translation of a given word
+    -   Thus, **decoder can access the whole input sentence to best predict the current word**
+    -   Very useful as different languages can have grammatical rules that put the words in **different orders, or some context provided later in the sentence may be helpful** to determine the best translation of a given word
     -   **Attention mask** can also be used in encoder/decoder to prevent model from paying attention to some special words 
         -   — Ex: the special padding word used to make all the inputs the same length when batching together sentences
 
@@ -101,4 +102,59 @@
 -   **Architecture**: Skeleton of the model — definition of each layer and each operation that happens within the model
 -   **Checkpoints**: These are the weights that will be loaded in a given architecture
 -   **Model**: This is an umbrella term that isn’t as precise as “architecture” or “checkpoint”: it can mean both
--   Ex: BERT is an architecture while bert-base-cased, a set of weights trained by the Google team for the first release of BERT, is a checkpoint. However, one can say “the BERT model” and “the bert-base-cased model.”
+-   Ex: BERT is an architecture while bert-base-cased, a set of weights trained by the Google team for the first release of BERT, is a checkpoint. However, one can say “the BERT model” and “the bert-base-cased model”.
+
+
+## Encoder models
+-   Input sentence -> Encoder -> Feature vectors (numerical representation of the words)
+-   Dimension of vector defined by architecture of model
+    -   For base BERT model, it is 768
+-   Good at extracting vectors carrying meaningful info about a sequence
+-   **“bi-directional”** attention (context from left & right), **self-attention** - **auto-encoding** models
+-   Representations of the word contains the value of the word, but **contextualised**
+    -   Ex: I/P: `"Welcome to NYC"` -> Encoder -> Representation of `"to"` isn't representation of just `"to"`, also takes into account the words around it (context)
+    -   Attention mechanism relates to different positions in a single sequence to compute the representation
+-   Vector of 768 values holds meaning of the word within the text 
+-   At each stage, attention layers can access all words in initial sentence 
+-   Usecases
+    -   Natural Language Understanding
+    -   Seq classification, QA tasks and masked LM 
+-   Examples
+    -   BERT - Standalone encoder model at the time of release 
+    -   DistilBERT
+    -   ELECTRA
+    -   RoBERTa
+    -   ALBERT
+-   Masked LM - task of predicting a hidden word in a sequence of words
+    -   Ex: `"My ??? is Sylvian."` (BERT can predict it as `"name"` from the context taken from `"Sylvian"` on right)
+    -   Neverthless, encoder model need to have a good understanding of the sequence, relationship/interdependence between words to predict it
+-   Seq classification
+    -   Sentiment Analysis
+        -   Examples: 
+            -   `"Even though I'm sad to see them go, I couldn't be more grateful"` - Positive
+            -   `"I'm sad to see them go, I can't be grateful"` - Negative
+        -   Both sentences use almost same words, but meaning is different and model is able to grasp the diff
+
+
+## Decoder models
+-   Example of popular decoder-only architecture is GPT-2
+-   Input sentence -> Decoder -> Feature vectors (numerical representation of the words)
+-   Ex: I/P: `"Welcome to NYC"` -> Decoder -> Representation of `"to"` isn't representation of just `"to"`, also takes into account the words around it (context)
+-   Dimension of vector defined by architecture of model
+-   **“uni-directional”** attention, **masked self-attention** - **auto-regressive** models
+-   **Auto-regressive** - reuse their past O/P as I/P in the following steps
+-  **Difference from encoders**: 
+   -  Masked self-attention, words can only see words on left side, right side is hidden. Ex: `"to"` vector is unmodified by `"NYC"` word. Right context of the word is masked.
+   -  **Decoders only have access to a single context** (left or right context)
+-   Pretraining of decoder models usually revolves around predicting the next word in the sentence
+-   Usecases
+    -   **Text Generation**
+-   Examples
+    -   CTRL
+    -   GPT
+    -   GPT-2
+    -   Transformer XL
+-   **Causal Language Modelling** (Guessing next word in a sentence)
+    -   Ability to generate a word/sequence of words given a sequence of words
+-   GPT-2 has maximum context size of 1024, we could generate upto 1024 words
+  
