@@ -34,7 +34,7 @@ print("dy/dw = ", w.grad)
 print("dy/db = ", b.grad)
 
 # =======================================================
-print("\n\n---- RANDOM EXPLORATIONS ----\n")
+print("\n\n---- MORE ABOUT GRAD ----\n")
 
 # To calculate gradients of function w.r.t X
 x = torch.randn(3, requires_grad=True)
