@@ -22,30 +22,25 @@ Here are some other references I've used:
 # # !python -m spacy download de
 # !python -m spacy download de_core_news_sm
 
+import math
 import os
+import random
 import re
 import time
-import math
-import random
 import unicodedata
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
-from tqdm import tqdm
-
+import seaborn as sns
 import spacy
-
-from sklearn.model_selection import train_test_split
-
 import torch
+import torch.nn.functional as F
+from sklearn.model_selection import train_test_split
 from torch import nn, optim
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
-
-import seaborn as sns
-import matplotlib.pyplot as plt
-import torch.nn.functional as F
+from tqdm import tqdm
 
 # TODO:
 # from machine_learning.utils import DATA_ROOT_DIR
@@ -329,7 +324,15 @@ class Decoder(nn.Module):
 
 
 class AttnDecoderRNN(nn.Module):
-    def __init__(self, output_dim, emb_dim, hidden_dim, n_layers, dropout_p=0.1, max_length=MAX_LENGTH):
+    def __init__(
+        self,
+        output_dim,
+        emb_dim,
+        hidden_dim,
+        n_layers,
+        dropout_p=0.1,
+        max_length=MAX_LENGTH,
+    ):
         super(AttnDecoderRNN, self).__init__()
         self.output_dim = output_dim
         self.hidden_dim = hidden_dim
@@ -429,7 +432,7 @@ class EncoderDecoderAttention(nn.Module):
                 input, hidden_state, cell_state
             )
             outputs[t] = output
-            teacher_for3 - Neural Machine Translation by Jointly Learning to Align and Translatece = random.random() < teacher_forcing_ratio
+            teacher_force = random.random() < teacher_forcing_ratio
             pred = output.argmax(1)
             input = y[t] if teacher_force else pred
 
@@ -532,7 +535,7 @@ def evaluate(model, iterator, criterion):
 
 def inference(model, sentence):
     model.eval()
-    result = []3 - Neural Machine Translation by Jointly Learning to Align and Translate
+    result = []
 
     with torch.no_grad():
         sentence = sentence.to(device)
@@ -553,7 +556,7 @@ def inference(model, sentence):
             result.append(en_vocab.itos[pred.item()])
             inp = pred
 
-    return " ".join(res3 - Neural Machine Translation by Jointly Learning to Align and Translateult)
+    return " ".join(result)
 
 
 def epoch_time(start_time, end_time):
@@ -579,7 +582,7 @@ sample_source = " ".join(
     ]
 )
 sample_target = " ".join(
-    [3 - Neural Machine Translation by Jointly Learning to Align and Translate
+    [
         word
         for word in fun_en(sample_batch[1][:, 101])
         if word not in ["<pad>", "<sos>", "<eos>"]

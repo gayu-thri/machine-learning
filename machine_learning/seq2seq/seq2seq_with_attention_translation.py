@@ -94,16 +94,16 @@ models, respectively.
 **Requirements**
 """
 
-from io import open
-import unicodedata
-import string
-import re
 import random
+import re
+import string
+import unicodedata
+from io import open
 
 import torch
 import torch.nn as nn
-from torch import optim
 import torch.nn.functional as F
+from torch import optim
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -163,7 +163,7 @@ class Lang:
         self.n_words = 2  # Count SOS and EOS
 
     def addSentence(self, sentence):
-        for word in sentence.split(' '):
+        for word in sentence.split(" "):
             self.addWord(word)
 
     def addWord(self, word):
@@ -175,6 +175,7 @@ class Lang:
         else:
             self.word2count[word] += 1
 
+
 """The files are all in Unicode, to simplify we will turn Unicode
 characters to ASCII, make everything lowercase, and trim most
 punctuation.
@@ -183,13 +184,14 @@ punctuation.
 
 """
 
+
 # Turn a Unicode string to plain ASCII, thanks to
 # https://stackoverflow.com/a/518232/2809427
 def unicodeToAscii(s):
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', s)
-        if unicodedata.category(c) != 'Mn'
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn"
     )
+
 
 # Lowercase, trim, and remove non-letter characters
 
@@ -200,6 +202,7 @@ def normalizeString(s):
     s = re.sub(r"[^a-zA-Z.!?]+", r" ", s)
     return s
 
+
 """To read the data file we will split the file into lines, and then split
 lines into pairs. The files are all English → Other Language, so if we
 want to translate from Other Language → English I added the ``reverse``
@@ -209,15 +212,24 @@ flag to reverse the pairs.
 
 """
 
+
 def readLangs(lang1, lang2, reverse=False):
     print("Reading lines...")
 
     # Read the file and split into lines
-    lines = open('/content/drive/MyDrive/Machine Learning End To End/data/seq2seq/data/%s-%s.txt' % (lang1, lang2), encoding='utf-8').\
-        read().strip().split('\n')
+    lines = (
+        open(
+            "/content/drive/MyDrive/Machine Learning End To End/data/seq2seq/data/%s-%s.txt"
+            % (lang1, lang2),
+            encoding="utf-8",
+        )
+        .read()
+        .strip()
+        .split("\n")
+    )
 
     # Split every line into pairs and normalize
-    pairs = [[normalizeString(s) for s in l.split('\t')] for l in lines]
+    pairs = [[normalizeString(s) for s in l.split("\t")] for l in lines]
 
     # Reverse pairs, make Lang instances
     if reverse:
@@ -229,6 +241,7 @@ def readLangs(lang1, lang2, reverse=False):
         output_lang = Lang(lang2)
 
     return input_lang, output_lang, pairs
+
 
 """Since there are a *lot* of example sentences and we want to train
 something quickly, we'll trim the data set to only relatively short and
@@ -245,23 +258,32 @@ earlier).
 MAX_LENGTH = 10
 
 eng_prefixes = (
-    "i am ", "i m ",
-    "he is", "he s ",
-    "she is", "she s ",
-    "you are", "you re ",
-    "we are", "we re ",
-    "they are", "they re "
+    "i am ",
+    "i m ",
+    "he is",
+    "he s ",
+    "she is",
+    "she s ",
+    "you are",
+    "you re ",
+    "we are",
+    "we re ",
+    "they are",
+    "they re ",
 )
 
 
 def filterPair(p):
-    return len(p[0].split(' ')) < MAX_LENGTH and \
-        len(p[1].split(' ')) < MAX_LENGTH and \
-        p[1].startswith(eng_prefixes)
+    return (
+        len(p[0].split(" ")) < MAX_LENGTH
+        and len(p[1].split(" ")) < MAX_LENGTH
+        and p[1].startswith(eng_prefixes)
+    )
 
 
 def filterPairs(pairs):
     return [pair for pair in pairs if filterPair(pair)]
+
 
 """The full process for preparing the data is:
 
@@ -272,6 +294,7 @@ def filterPairs(pairs):
 
 
 """
+
 
 def prepareData(lang1, lang2, reverse=False):
     input_lang, output_lang, pairs = readLangs(lang1, lang2, reverse)
@@ -288,7 +311,7 @@ def prepareData(lang1, lang2, reverse=False):
     return input_lang, output_lang, pairs
 
 
-input_lang, output_lang, pairs = prepareData('eng', 'fra', True)
+input_lang, output_lang, pairs = prepareData("eng", "fra", True)
 print(random.choice(pairs))
 
 """## The Seq2Seq Model
@@ -334,6 +357,7 @@ next input word.
    :alt:
 """
 
+
 class EncoderRNN(nn.Module):
     def __init__(self, input_size, hidden_size):
         super(EncoderRNN, self).__init__()
@@ -350,6 +374,7 @@ class EncoderRNN(nn.Module):
 
     def initHidden(self):
         return torch.zeros(1, 1, self.hidden_size, device=device)
+
 
 """### The Decoder
 
@@ -372,6 +397,7 @@ last hidden state).
    :alt:
 """
 
+
 class DecoderRNN(nn.Module):
     def __init__(self, hidden_size, output_size):
         super(DecoderRNN, self).__init__()
@@ -391,6 +417,7 @@ class DecoderRNN(nn.Module):
 
     def initHidden(self):
         return torch.zeros(1, 1, self.hidden_size, device=device)
+
 
 """I encourage you to train and observe the results of this model, but to
 save space we'll be going straight for the gold and introducing the
@@ -424,6 +451,7 @@ while shorter sentences will only use the first few.
    :alt:
 """
 
+
 class AttnDecoderRNN(nn.Module):
     def __init__(self, hidden_size, output_size, dropout_p=0.1, max_length=MAX_LENGTH):
         super(AttnDecoderRNN, self).__init__()
@@ -444,9 +472,11 @@ class AttnDecoderRNN(nn.Module):
         embedded = self.dropout(embedded)
 
         attn_weights = F.softmax(
-            self.attn(torch.cat((embedded[0], hidden[0]), 1)), dim=1)
-        attn_applied = torch.bmm(attn_weights.unsqueeze(0),
-                                 encoder_outputs.unsqueeze(0))
+            self.attn(torch.cat((embedded[0], hidden[0]), 1)), dim=1
+        )
+        attn_applied = torch.bmm(
+            attn_weights.unsqueeze(0), encoder_outputs.unsqueeze(0)
+        )
 
         output = torch.cat((embedded[0], attn_applied[0]), 1)
         output = self.attn_combine(output).unsqueeze(0)
@@ -459,6 +489,7 @@ class AttnDecoderRNN(nn.Module):
 
     def initHidden(self):
         return torch.zeros(1, 1, self.hidden_size, device=device)
+
 
 """<div class="alert alert-info"><h4>Note</h4><p>There are other forms of attention that work around the length
   limitation by using a relative position approach. Read about "local
@@ -478,8 +509,9 @@ EOS token to both sequences.
 
 """
 
+
 def indexesFromSentence(lang, sentence):
-    return [lang.word2index[word] for word in sentence.split(' ')]
+    return [lang.word2index[word] for word in sentence.split(" ")]
 
 
 def tensorFromSentence(lang, sentence):
@@ -492,6 +524,7 @@ def tensorsFromPair(pair):
     input_tensor = tensorFromSentence(input_lang, pair[0])
     target_tensor = tensorFromSentence(output_lang, pair[1])
     return (input_tensor, target_tensor)
+
 
 """### Training the Model
 
@@ -524,7 +557,16 @@ choose to use teacher forcing or not with a simple if statement. Turn
 teacher_forcing_ratio = 0.5
 
 
-def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, max_length=MAX_LENGTH):
+def train(
+    input_tensor,
+    target_tensor,
+    encoder,
+    decoder,
+    encoder_optimizer,
+    decoder_optimizer,
+    criterion,
+    max_length=MAX_LENGTH,
+):
     encoder_hidden = encoder.initHidden()
 
     encoder_optimizer.zero_grad()
@@ -538,8 +580,7 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
     loss = 0
 
     for ei in range(input_length):
-        encoder_output, encoder_hidden = encoder(
-            input_tensor[ei], encoder_hidden)
+        encoder_output, encoder_hidden = encoder(input_tensor[ei], encoder_hidden)
         encoder_outputs[ei] = encoder_output[0, 0]
 
     decoder_input = torch.tensor([[SOS_token]], device=device)
@@ -552,7 +593,8 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
         # Teacher forcing: Feed the target as the next input
         for di in range(target_length):
             decoder_output, decoder_hidden, decoder_attention = decoder(
-                decoder_input, decoder_hidden, encoder_outputs)
+                decoder_input, decoder_hidden, encoder_outputs
+            )
             loss += criterion(decoder_output, target_tensor[di])
             decoder_input = target_tensor[di]  # Teacher forcing
 
@@ -560,7 +602,8 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
         # Without teacher forcing: use its own predictions as the next input
         for di in range(target_length):
             decoder_output, decoder_hidden, decoder_attention = decoder(
-                decoder_input, decoder_hidden, encoder_outputs)
+                decoder_input, decoder_hidden, encoder_outputs
+            )
             topv, topi = decoder_output.topk(1)
             decoder_input = topi.squeeze().detach()  # detach from history as input
 
@@ -575,6 +618,7 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
 
     return loss.item() / target_length
 
+
 """This is a helper function to print time elapsed and estimated time
 remaining given the current time and progress %.
 
@@ -582,14 +626,14 @@ remaining given the current time and progress %.
 
 """
 
-import time
 import math
+import time
 
 
 def asMinutes(s):
     m = math.floor(s / 60)
     s -= m * 60
-    return '%dm %ds' % (m, s)
+    return "%dm %ds" % (m, s)
 
 
 def timeSince(since, percent):
@@ -597,7 +641,8 @@ def timeSince(since, percent):
     s = now - since
     es = s / (percent)
     rs = es - s
-    return '%s (- %s)' % (asMinutes(s), asMinutes(rs))
+    return "%s (- %s)" % (asMinutes(s), asMinutes(rs))
+
 
 """The whole training process looks like this:
 
@@ -613,7 +658,10 @@ of examples, time so far, estimated time) and average loss.
 
 """
 
-def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, learning_rate=0.01):
+
+def trainIters(
+    encoder, decoder, n_iters, print_every=1000, plot_every=100, learning_rate=0.01
+):
     start = time.time()
     plot_losses = []
     print_loss_total = 0  # Reset every print_every
@@ -621,8 +669,7 @@ def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, lear
 
     encoder_optimizer = optim.SGD(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.SGD(decoder.parameters(), lr=learning_rate)
-    training_pairs = [tensorsFromPair(random.choice(pairs))
-                      for i in range(n_iters)]
+    training_pairs = [tensorsFromPair(random.choice(pairs)) for i in range(n_iters)]
     criterion = nn.NLLLoss()
 
     for iter in range(1, n_iters + 1):
@@ -630,16 +677,30 @@ def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, lear
         input_tensor = training_pair[0]
         target_tensor = training_pair[1]
 
-        loss = train(input_tensor, target_tensor, encoder,
-                     decoder, encoder_optimizer, decoder_optimizer, criterion)
+        loss = train(
+            input_tensor,
+            target_tensor,
+            encoder,
+            decoder,
+            encoder_optimizer,
+            decoder_optimizer,
+            criterion,
+        )
         print_loss_total += loss
         plot_loss_total += loss
 
         if iter % print_every == 0:
             print_loss_avg = print_loss_total / print_every
             print_loss_total = 0
-            print('%s (%d %d%%) %.4f' % (timeSince(start, iter / n_iters),
-                                         iter, iter / n_iters * 100, print_loss_avg))
+            print(
+                "%s (%d %d%%) %.4f"
+                % (
+                    timeSince(start, iter / n_iters),
+                    iter,
+                    iter / n_iters * 100,
+                    print_loss_avg,
+                )
+            )
 
         if iter % plot_every == 0:
             plot_loss_avg = plot_loss_total / plot_every
@@ -647,6 +708,7 @@ def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, lear
             plot_loss_total = 0
 
     showPlot(plot_losses)
+
 
 """### Plotting results
 
@@ -658,7 +720,8 @@ Plotting is done with matplotlib, using the array of loss values
 """
 
 import matplotlib.pyplot as plt
-plt.switch_backend('agg')
+
+plt.switch_backend("agg")
 import matplotlib.ticker as ticker
 import numpy as np
 
@@ -670,6 +733,7 @@ def showPlot(points):
     loc = ticker.MultipleLocator(base=0.2)
     ax.yaxis.set_major_locator(loc)
     plt.plot(points)
+
 
 """## Evaluation
 
@@ -683,6 +747,7 @@ attention outputs for display later.
 
 """
 
+
 def evaluate(encoder, decoder, sentence, max_length=MAX_LENGTH):
     with torch.no_grad():
         input_tensor = tensorFromSentence(input_lang, sentence)
@@ -692,8 +757,7 @@ def evaluate(encoder, decoder, sentence, max_length=MAX_LENGTH):
         encoder_outputs = torch.zeros(max_length, encoder.hidden_size, device=device)
 
         for ei in range(input_length):
-            encoder_output, encoder_hidden = encoder(input_tensor[ei],
-                                                     encoder_hidden)
+            encoder_output, encoder_hidden = encoder(input_tensor[ei], encoder_hidden)
             encoder_outputs[ei] += encoder_output[0, 0]
 
         decoder_input = torch.tensor([[SOS_token]], device=device)  # SOS
@@ -705,18 +769,20 @@ def evaluate(encoder, decoder, sentence, max_length=MAX_LENGTH):
 
         for di in range(max_length):
             decoder_output, decoder_hidden, decoder_attention = decoder(
-                decoder_input, decoder_hidden, encoder_outputs)
+                decoder_input, decoder_hidden, encoder_outputs
+            )
             decoder_attentions[di] = decoder_attention.data
             topv, topi = decoder_output.data.topk(1)
             if topi.item() == EOS_token:
-                decoded_words.append('<EOS>')
+                decoded_words.append("<EOS>")
                 break
             else:
                 decoded_words.append(output_lang.index2word[topi.item()])
 
             decoder_input = topi.squeeze().detach()
 
-        return decoded_words, decoder_attentions[:di + 1]
+        return decoded_words, decoder_attentions[: di + 1]
+
 
 """We can evaluate random sentences from the training set and print out the
 input, target, and output to make some subjective quality judgements:
@@ -725,15 +791,17 @@ input, target, and output to make some subjective quality judgements:
 
 """
 
+
 def evaluateRandomly(encoder, decoder, n=10):
     for i in range(n):
         pair = random.choice(pairs)
-        print('>', pair[0])
-        print('=', pair[1])
+        print(">", pair[0])
+        print("=", pair[1])
         output_words, attentions = evaluate(encoder, decoder, pair[0])
-        output_sentence = ' '.join(output_words)
-        print('<', output_sentence)
-        print('')
+        output_sentence = " ".join(output_words)
+        print("<", output_sentence)
+        print("")
+
 
 """## Training and Evaluating
 
@@ -757,12 +825,14 @@ reasonable results.
 
 hidden_size = 256
 encoder1 = EncoderRNN(input_lang.n_words, hidden_size).to(device)
-attn_decoder1 = AttnDecoderRNN(hidden_size, output_lang.n_words, dropout_p=0.1).to(device)
+attn_decoder1 = AttnDecoderRNN(hidden_size, output_lang.n_words, dropout_p=0.1).to(
+    device
+)
 
 trainIters(encoder1, attn_decoder1, 75000, print_every=5000)
 
-torch.save(encoder1.state_dict(), 'encoder.dict')
-torch.save(attn_decoder1.state_dict(), 'decoder.dict')
+torch.save(encoder1.state_dict(), "encoder.dict")
+torch.save(attn_decoder1.state_dict(), "decoder.dict")
 
 # For loading it back
 # encoder = EncoderRNN(input_lang.n_words, hidden_size).to(device)
@@ -788,8 +858,7 @@ output steps:
 
 """
 
-output_words, attentions = evaluate(
-    encoder1, attn_decoder1, "je suis trop froid .")
+output_words, attentions = evaluate(encoder1, attn_decoder1, "je suis trop froid .")
 plt.matshow(attentions.numpy())
 
 """For a better viewing experience we will do the extra work of adding axes
@@ -799,17 +868,17 @@ and labels:
 
 """
 
+
 def showAttention(input_sentence, output_words, attentions):
     # Set up figure with colorbar
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    cax = ax.matshow(attentions.numpy(), cmap='bone')
+    cax = ax.matshow(attentions.numpy(), cmap="bone")
     fig.colorbar(cax)
 
     # Set up axes
-    ax.set_xticklabels([''] + input_sentence.split(' ') +
-                       ['<EOS>'], rotation=90)
-    ax.set_yticklabels([''] + output_words)
+    ax.set_xticklabels([""] + input_sentence.split(" ") + ["<EOS>"], rotation=90)
+    ax.set_yticklabels([""] + output_words)
 
     # Show label at every tick
     ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
@@ -819,10 +888,9 @@ def showAttention(input_sentence, output_words, attentions):
 
 
 def evaluateAndShowAttention(input_sentence):
-    output_words, attentions = evaluate(
-        encoder1, attn_decoder1, input_sentence)
-    print('input =', input_sentence)
-    print('output =', ' '.join(output_words))
+    output_words, attentions = evaluate(encoder1, attn_decoder1, input_sentence)
+    print("input =", input_sentence)
+    print("output =", " ".join(output_words))
     showAttention(input_sentence, output_words, attentions)
 
 
@@ -858,4 +926,3 @@ evaluateAndShowAttention("c est un jeune directeur plein de talent .")
 
 
 """
-

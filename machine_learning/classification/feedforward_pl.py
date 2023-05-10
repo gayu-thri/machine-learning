@@ -4,11 +4,11 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
 import torchvision
 import torchvision.transforms as transforms
+from pytorch_lightning.callbacks import ModelCheckpoint, TQDMProgressBar
+from torch.nn import functional as F
 from torchmetrics import Accuracy
-from pytorch_lightning.callbacks import TQDMProgressBar, ModelCheckpoint
 
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
