@@ -329,19 +329,18 @@ class Decoder(nn.Module):
 
 
 class AttnDecoderRNN(nn.Module):
-    def __init__(self, hidden_size, output_size, dropout_p=0.1, max_length=MAX_LENGTH):
+    def __init__(self, output_dim, emb_dim, hidden_dim, n_layers, dropout_p=0.1, max_length=MAX_LENGTH):
         super(AttnDecoderRNN, self).__init__()
-        self.hidden_size = hidden_size
-        self.output_size = output_size
-        self.dropout_p = dropout_p
-        self.max_length = max_length
-
-        self.embedding = nn.Embedding(self.output_size, self.hidden_size)
-        self.attn = nn.Linear(self.hidden_size * 2, self.max_length)
-        self.attn_combine = nn.Linear(self.hidden_size * 2, self.hidden_size)
-        self.dropout = nn.Dropout(self.dropout_p)
-        self.lstm = nn.LSTM(self.hidden_size, self.hidden_size)
-        self.out = nn.Linear(self.hidden_size, self.output_size)
+        self.output_dim = output_dim
+        self.hidden_dim = hidden_dim
+        self.n_layers = n_layers
+        self.embedding = nn.Embedding(output_dim, emb_dim)
+        # Attention layers
+        self.attn = nn.Linear(emb_dim + hidden_dim, max_length)
+        self.attn_combine = nn.Linear(emb_dim + hidden_dim, hidden_dim)
+        self.dropout = nn.Dropout(dropout_p)
+        self.lstm = nn.LSTM(hidden_dim, hidden_dim)
+        self.out = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, input, hidden_state, encoder_outputs):
         embedded = self.embedding(input).view(1, 1, -1)
@@ -430,7 +429,7 @@ class EncoderDecoderAttention(nn.Module):
                 input, hidden_state, cell_state
             )
             outputs[t] = output
-            teacher_force = random.random() < teacher_forcing_ratio
+            teacher_for3 - Neural Machine Translation by Jointly Learning to Align and Translatece = random.random() < teacher_forcing_ratio
             pred = output.argmax(1)
             input = y[t] if teacher_force else pred
 
@@ -533,7 +532,7 @@ def evaluate(model, iterator, criterion):
 
 def inference(model, sentence):
     model.eval()
-    result = []
+    result = []3 - Neural Machine Translation by Jointly Learning to Align and Translate
 
     with torch.no_grad():
         sentence = sentence.to(device)
@@ -554,7 +553,7 @@ def inference(model, sentence):
             result.append(en_vocab.itos[pred.item()])
             inp = pred
 
-    return " ".join(result)
+    return " ".join(res3 - Neural Machine Translation by Jointly Learning to Align and Translateult)
 
 
 def epoch_time(start_time, end_time):
@@ -580,7 +579,7 @@ sample_source = " ".join(
     ]
 )
 sample_target = " ".join(
-    [
+    [3 - Neural Machine Translation by Jointly Learning to Align and Translate
         word
         for word in fun_en(sample_batch[1][:, 101])
         if word not in ["<pad>", "<sos>", "<eos>"]
