@@ -1,5 +1,9 @@
 # seq2seq
 
+# Sources
+## Seq2Seq + Attention - Source
+- seq2seq_with_attention_translation.ipynb - https://pytorch.org/tutorials/intermediate/seq2seq_translation_tutorial.html#loading-data-files
+
 ### Word to word translation
 - Consider the example, 
   - If English is translated to Koren
