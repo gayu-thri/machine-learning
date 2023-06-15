@@ -21,7 +21,8 @@ First you have to store your authentication token from the Hugging Face website 
 """
 
 from huggingface_hub import notebook_login
-notebook_login() # token="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"
+
+notebook_login()  # token="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"
 
 # import os
 # os.environ["HUGGINGFACE_TOKEN"] = "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"
@@ -62,7 +63,7 @@ We will see how to easily load a dataset for these kinds of tasks and use the `T
 This notebook is built to run on any token classification task, with any model checkpoint from the [Model Hub](https://huggingface.co/models) as long as that model has a version with a token classification head and a fast tokenizer (check on [this table](https://huggingface.co/transformers/index.html#bigtable) if this is the case). It might just need some small adjustments if you decide to use a different dataset than the one used here. Depending on you model and the GPU you are using, you might need to adjust the batch size to avoid out-of-memory errors. Set those three parameters, then the rest of the notebook should run smoothly:
 """
 
-task = "ner" # Should be one of "ner", "pos" or "chunk"
+task = "ner"  # Should be one of "ner", "pos" or "chunk"
 model_checkpoint = "distilbert-base-uncased"
 batch_size = 16
 
@@ -111,22 +112,28 @@ import random
 import pandas as pd
 from IPython.display import display, HTML
 
+
 def show_random_elements(dataset, num_examples=10):
-    assert num_examples <= len(dataset), "Can't pick more elements than there are in the dataset."
+    assert num_examples <= len(
+        dataset
+    ), "Can't pick more elements than there are in the dataset."
     picks = []
     for _ in range(num_examples):
-        pick = random.randint(0, len(dataset)-1)
+        pick = random.randint(0, len(dataset) - 1)
         while pick in picks:
-            pick = random.randint(0, len(dataset)-1)
+            pick = random.randint(0, len(dataset) - 1)
         picks.append(pick)
-    
+
     df = pd.DataFrame(dataset[picks])
     for column, typ in dataset.features.items():
         if isinstance(typ, ClassLabel):
             df[column] = df[column].transform(lambda i: typ.names[i])
         elif isinstance(typ, Sequence) and isinstance(typ.feature, ClassLabel):
-            df[column] = df[column].transform(lambda x: [typ.feature.names[i] for i in x])
+            df[column] = df[column].transform(
+                lambda x: [typ.feature.names[i] for i in x]
+            )
     display(HTML(df.to_html()))
+
 
 show_random_elements(datasets["train"])
 
@@ -143,12 +150,13 @@ That vocabulary will be cached, so it's not downloaded again the next time we ru
 """
 
 from transformers import AutoTokenizer
-    
+
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
 """The following assertion ensures that our tokenizer is a fast tokenizers (backed by Rust) from the 🤗 Tokenizers library. Those fast tokenizers are available for almost all models, and we will need some of the special features they have for our preprocessing."""
 
 import transformers
+
 assert isinstance(tokenizer, transformers.PreTrainedTokenizerFast)
 
 """You can check which type of models have a fast tokenizer available and which don't on the [big table of models](https://huggingface.co/transformers/index.html#bigtable).
@@ -163,7 +171,10 @@ tokenizer("Hello, this is one sentence!")
 If, as is the case here, your inputs have already been split into words, you should pass the list of words to your tokenzier with the argument `is_split_into_words=True`:
 """
 
-tokenizer(["Hello", ",", "this", "is", "one", "sentence", "split", "into", "words", "."], is_split_into_words=True)
+tokenizer(
+    ["Hello", ",", "this", "is", "one", "sentence", "split", "into", "words", "."],
+    is_split_into_words=True,
+)
 
 """Note that transformers are often pretrained with subword tokenizers, meaning that even if your inputs have been split into words already, each of those words could be split again by the tokenizer. Let's look at an example of that:"""
 
@@ -197,8 +208,11 @@ label_all_tokens = True
 
 """We're now ready to write the function that will preprocess our samples. We feed them to the `tokenizer` with the argument `truncation=True` (to truncate texts that are bigger than the maximum size allowed by the model) and `is_split_into_words=True` (as seen above). Then we align the labels with the token ids using the strategy we picked:"""
 
+
 def tokenize_and_align_labels(examples):
-    tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True)
+    tokenized_inputs = tokenizer(
+        examples["tokens"], truncation=True, is_split_into_words=True
+    )
 
     labels = []
     for i, label in enumerate(examples[f"{task}_tags"]):
@@ -224,9 +238,10 @@ def tokenize_and_align_labels(examples):
     tokenized_inputs["labels"] = labels
     return tokenized_inputs
 
+
 """This function works with one or several examples. In the case of several examples, the tokenizer will return a list of lists for each key:"""
 
-tokenize_and_align_labels(datasets['train'][:5])
+tokenize_and_align_labels(datasets["train"][:5])
 
 """To apply this function on all the sentences (or pairs of sentences) in our dataset, we just use the `map` method of our `dataset` object we created earlier. This will apply the function on all the elements of all the splits in `dataset`, so our training, validation and testing data will be preprocessed in one single command."""
 
@@ -243,7 +258,9 @@ Now that our data is ready, we can download the pretrained model and fine-tune i
 
 from transformers import AutoModelForTokenClassification, TrainingArguments, Trainer
 
-model = AutoModelForTokenClassification.from_pretrained(model_checkpoint, num_labels=len(label_list))
+model = AutoModelForTokenClassification.from_pretrained(
+    model_checkpoint, num_labels=len(label_list)
+)
 
 """The warning is telling us we are throwing away some weights (the `vocab_transform` and `vocab_layer_norm` layers) and randomly initializing some other (the `pre_classifier` and `classifier` layers). This is absolutely normal in this case, because we are removing the head used to pretrain the model on a masked language modeling objective and replacing it with a new head for which we don't have pretrained weights, so the library warns us we should fine-tune this model before using it for inference, which is exactly what we are going to do.
 
@@ -253,7 +270,7 @@ To instantiate a `Trainer`, we will need to define three more things. The most i
 model_name = model_checkpoint.split("/")[-1]
 args = TrainingArguments(
     f"{model_name}-finetuned-{task}",
-    evaluation_strategy = "epoch",
+    evaluation_strategy="epoch",
     learning_rate=2e-5,
     per_device_train_batch_size=batch_size,
     per_device_eval_batch_size=batch_size,
@@ -292,6 +309,7 @@ The following function does all this post-processing on the result of `Trainer.e
 
 import numpy as np
 
+
 def compute_metrics(p):
     predictions, labels = p
     predictions = np.argmax(predictions, axis=2)
@@ -314,6 +332,7 @@ def compute_metrics(p):
         "accuracy": results["overall_accuracy"],
     }
 
+
 """Note that we drop the precision/recall/f1 computed for each category and only focus on the overall precision/recall/f1/accuracy.
 
 Then we just need to pass all of this along with our datasets to the `Trainer`:
@@ -326,7 +345,7 @@ trainer = Trainer(
     eval_dataset=tokenized_datasets["validation"],
     data_collator=data_collator,
     tokenizer=tokenizer,
-    compute_metrics=compute_metrics
+    compute_metrics=compute_metrics,
 )
 
 """We can now finetune our model by just calling the `train` method:"""
@@ -370,5 +389,6 @@ model = AutoModelForTokenClassification.from_pretrained("sgugger/my-awesome-mode
 
 from transformers import AutoModelForTokenClassification
 
-model = AutoModelForTokenClassification.from_pretrained("Gayu/distilbert-base-uncased-finetuned-ner")
-
+model = AutoModelForTokenClassification.from_pretrained(
+    "Gayu/distilbert-base-uncased-finetuned-ner"
+)

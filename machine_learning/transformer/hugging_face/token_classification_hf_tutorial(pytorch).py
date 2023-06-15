@@ -10,40 +10,57 @@ Original file is located at
 
 Install the Transformers, Datasets, and Evaluate libraries to run this notebook.
 """
+# !pip install datasets evaluate transformers[sentencepiece]
+# !pip install accelerate
+# !pip install seqeval
+# !apt install git-lfs
 
-!pip install datasets evaluate transformers[sentencepiece]
-!pip install accelerate
 # To run the training on TPU, you will need to uncomment the following line:
 # !pip install cloud-tpu-client==0.10 torch==1.9.0 https://storage.googleapis.com/tpu-pytorch/wheels/torch_xla-1.9-cp37-cp37m-linux_x86_64.whl
-!apt install git-lfs
 
 """You will need to setup git, adapt your email and name in the following cell."""
-
-!git config --global user.email "you@example.com"
-!git config --global user.name "Your Name"
+# !git config --global user.email "you@example.com"
+# !git config --global user.name "Your Name"
 
 """You will also need to be logged in to the Hugging Face Hub. Execute the following and enter your credentials."""
+# from huggingface_hub import notebook_login
+# notebook_login()
+"""Use `huggingface-cli login`"""
 
-from huggingface_hub import notebook_login
-
-notebook_login()
-
+import numpy as np
 from datasets import load_dataset
+from transformers import (
+    DataCollatorForTokenClassification,
+    AutoModelForTokenClassification,
+    TrainingArguments,
+    Trainer,
+    get_scheduler,
+    pipeline,
+    AutoTokenizer,
+)
+import evaluate
+from torch.utils.data import DataLoader
+from torch.optim import AdamW
+from accelerate import Accelerator
+from huggingface_hub import Repository, get_full_repo_name
 
+from tqdm.auto import tqdm
+import torch
+
+## Load the dataset
 raw_datasets = load_dataset("conll2003")
-
-raw_datasets
-
-raw_datasets["train"][0]["tokens"]
-
-raw_datasets["train"][0]["ner_tags"]
-
+print(f"Raw datasets: {raw_datasets}")
+tokens = raw_datasets["train"][0]["tokens"]
+ner_tags = raw_datasets["train"][0]["ner_tags"]
 ner_feature = raw_datasets["train"].features["ner_tags"]
-ner_feature
-
 label_names = ner_feature.feature.names
-label_names
+print(f"Tokens: {tokens}")
+print(f"NER tags (IDs): {ner_tags}")
+print(f"NER tags (Features): {ner_feature}")
+print(f"NER tags (Label names): {label_names}")
 
+
+## Tags for a sample sentence in the dataset
 words = raw_datasets["train"][0]["tokens"]
 labels = raw_datasets["train"][0]["ner_tags"]
 line1 = ""
@@ -53,21 +70,25 @@ for word, label in zip(words, labels):
     max_length = max(len(word), len(full_label))
     line1 += word + " " * (max_length - len(word) + 1)
     line2 += full_label + " " * (max_length - len(full_label) + 1)
-
+print("=" * 50, "\nSample sentence with tags")
 print(line1)
 print(line2)
+print("=" * 50)
 
-from transformers import AutoTokenizer
-
+## Tokenize
+print("Tokenization")
 model_checkpoint = "bert-base-cased"
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-
-tokenizer.is_fast
+print(f"Tokenizer is fast? {tokenizer.is_fast}")
 
 inputs = tokenizer(raw_datasets["train"][0]["tokens"], is_split_into_words=True)
-inputs.tokens()
+print(f"Sample Tokens: {inputs.tokens()}")
+print(f"Sample Word IDs: {inputs.word_ids()}")
+print("To have the sub-words have the same word ID as all the parts of it")
 
-inputs.word_ids()
+# Align labels with tokens
+print("=" * 50, "\nAlign labels with tokens")
+
 
 def align_labels_with_tokens(labels, word_ids):
     new_labels = []
@@ -91,10 +112,14 @@ def align_labels_with_tokens(labels, word_ids):
 
     return new_labels
 
+
 labels = raw_datasets["train"][0]["ner_tags"]
 word_ids = inputs.word_ids()
-print(labels)
-print(align_labels_with_tokens(labels, word_ids))
+print(f"Sample Labels: {labels}")
+print(f"Sample Aligned labels: {align_labels_with_tokens(labels, word_ids)}")
+
+print("=" * 50, "\nTokenize and align labels for the whole dataset")
+
 
 def tokenize_and_align_labels(examples):
     tokenized_inputs = tokenizer(
@@ -109,37 +134,35 @@ def tokenize_and_align_labels(examples):
     tokenized_inputs["labels"] = new_labels
     return tokenized_inputs
 
+
 tokenized_datasets = raw_datasets.map(
     tokenize_and_align_labels,
     batched=True,
     remove_columns=raw_datasets["train"].column_names,
 )
 
-from transformers import DataCollatorForTokenClassification
-
+print("=" * 50, "\nData Collation")
 data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
-
 batch = data_collator([tokenized_datasets["train"][i] for i in range(2)])
-batch["labels"]
+sample_labels = batch["labels"]
+print(f"Sample Batches Labels (After tokenizing and aligning): {sample_labels}")
 
 for i in range(2):
-    print(tokenized_datasets["train"][i]["labels"])
+    sample_og_label = tokenized_datasets["train"][i]["labels"]
+    print(f"Original label: {sample_og_label}")
 
-!pip install seqeval
-
-import evaluate
-
+## Metrics
+print("=" * 50, "\nMetrics")
 metric = evaluate.load("seqeval")
-
 labels = raw_datasets["train"][0]["ner_tags"]
 labels = [label_names[i] for i in labels]
-labels
+print(f"Sample labels: {labels}")
 
 predictions = labels.copy()
 predictions[2] = "O"
-metric.compute(predictions=[predictions], references=[labels])
-
-import numpy as np
+print(f"Sample predictions: {predictions}")
+res_metrics = metric.compute(predictions=[predictions], references=[labels])
+print(f"Sample metrics: \n{res_metrics}")
 
 
 def compute_metrics(eval_preds):
@@ -160,24 +183,24 @@ def compute_metrics(eval_preds):
         "accuracy": all_metrics["overall_accuracy"],
     }
 
+
+## Define mappings for Label and ID
 id2label = {i: label for i, label in enumerate(label_names)}
 label2id = {v: k for k, v in id2label.items()}
 
-from transformers import AutoModelForTokenClassification
 
-model = AutoModelForTokenClassification.from_pretrained(
-    model_checkpoint,
+## Training
+print("=" * 50, "\nTraining")
+model = AutoModelForTokenClassification.from_pretrained(* 50, 
+    model_checkpoint,  # bert-base-cased
     id2label=id2label,
     label2id=label2id,
 )
+print(f"Total number of labels: {model.config.num_labels}")
 
-model.config.num_labels
-
-from huggingface_hub import notebook_login
-
-notebook_login()
-
-from transformers import TrainingArguments
+# from huggingface_hub import notebook_login
+# notebook_login()
+# Use `huggingface-cli login`
 
 args = TrainingArguments(
     "bert-finetuned-ner",
@@ -188,8 +211,6 @@ args = TrainingArguments(
     weight_decay=0.01,
     push_to_hub=True,
 )
-
-from transformers import Trainer
 
 trainer = Trainer(
     model=model,
@@ -204,8 +225,10 @@ trainer.train()
 
 trainer.push_to_hub(commit_message="Training complete")
 
-from torch.utils.data import DataLoader
+## A custom training loop
+print("=" * 50, "\nA custom training loop")
 
+print("Initializing data loaders")
 train_dataloader = DataLoader(
     tokenized_datasets["train"],
     shuffle=True,
@@ -216,29 +239,31 @@ eval_dataloader = DataLoader(
     tokenized_datasets["validation"], collate_fn=data_collator, batch_size=8
 )
 
+## Getting model loaded from pretrained
+print("Getting model loaded from pretrained")
 model = AutoModelForTokenClassification.from_pretrained(
     model_checkpoint,
     id2label=id2label,
     label2id=label2id,
 )
 
-from torch.optim import AdamW
-
+## Initializing optimizers
+print("Initializing optimizers")
 optimizer = AdamW(model.parameters(), lr=2e-5)
 
-from accelerate import Accelerator
 
 accelerator = Accelerator()
 model, optimizer, train_dataloader, eval_dataloader = accelerator.prepare(
     model, optimizer, train_dataloader, eval_dataloader
 )
 
-from transformers import get_scheduler
 
 num_train_epochs = 3
 num_update_steps_per_epoch = len(train_dataloader)
 num_training_steps = num_train_epochs * num_update_steps_per_epoch
 
+## Initializing LR schedulers
+print("Initializing LR schedulers")
 lr_scheduler = get_scheduler(
     "linear",
     optimizer=optimizer,
@@ -246,14 +271,14 @@ lr_scheduler = get_scheduler(
     num_training_steps=num_training_steps,
 )
 
-from huggingface_hub import Repository, get_full_repo_name
 
 model_name = "bert-finetuned-ner"
 repo_name = get_full_repo_name(model_name)
-repo_name
+print(f"Repository name: {repo_name}")
 
 output_dir = "bert-finetuned-ner"
 repo = Repository(output_dir, clone_from=repo_name)
+
 
 def postprocess(predictions, labels):
     predictions = predictions.detach().cpu().clone().numpy()
@@ -267,8 +292,6 @@ def postprocess(predictions, labels):
     ]
     return true_labels, true_predictions
 
-from tqdm.auto import tqdm
-import torch
 
 progress_bar = tqdm(range(num_training_steps))
 
@@ -295,13 +318,17 @@ for epoch in range(num_train_epochs):
         labels = batch["labels"]
 
         # Necessary to pad predictions and labels for being gathered
-        predictions = accelerator.pad_across_processes(predictions, dim=1, pad_index=-100)
+        predictions = accelerator.pad_across_processes(
+            predictions, dim=1, pad_index=-100
+        )
         labels = accelerator.pad_across_processes(labels, dim=1, pad_index=-100)
 
         predictions_gathered = accelerator.gather(predictions)
         labels_gathered = accelerator.gather(labels)
 
-        true_predictions, true_labels = postprocess(predictions_gathered, labels_gathered)
+        true_predictions, true_labels = postprocess(
+            predictions_gathered, labels_gathered
+        )
         metric.add_batch(predictions=true_predictions, references=true_labels)
 
     results = metric.compute()
@@ -327,7 +354,6 @@ accelerator.wait_for_everyone()
 unwrapped_model = accelerator.unwrap_model(model)
 unwrapped_model.save_pretrained(output_dir, save_function=accelerator.save)
 
-from transformers import pipeline
 
 # Replace this with your own checkpoint
 model_checkpoint = "huggingface-course/bert-finetuned-ner"
@@ -335,4 +361,3 @@ token_classifier = pipeline(
     "token-classification", model=model_checkpoint, aggregation_strategy="simple"
 )
 token_classifier("My name is Sylvain and I work at Hugging Face in Brooklyn.")
-
